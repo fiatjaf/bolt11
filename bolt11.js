@@ -1,6 +1,4 @@
-const bech32 = require('bech32')
-const Buffer = require('buffer').Buffer
-const BN = require('bn.js')
+const {bech32, hex, utf8} = require('@scure/base')
 
 // defaults for encode; default timestamp is current time at call
 const DEFAULTNETWORK = {
@@ -43,15 +41,15 @@ const FEATUREBIT_ORDER = [
 ]
 
 const DIVISORS = {
-  m: new BN(1e3, 10),
-  u: new BN(1e6, 10),
-  n: new BN(1e9, 10),
-  p: new BN(1e12, 10)
+  m: BigInt(1e3),
+  u: BigInt(1e6),
+  n: BigInt(1e9),
+  p: BigInt(1e12)
 }
 
-const MAX_MILLISATS = new BN('2100000000000000000', 10)
+const MAX_MILLISATS = BigInt('2100000000000000000')
 
-const MILLISATS_PER_BTC = new BN(1e11, 10)
+const MILLISATS_PER_BTC = BigInt(1e11)
 
 const TAGCODES = {
   payment_hash: 1,
@@ -76,12 +74,12 @@ for (let i = 0, keys = Object.keys(TAGCODES); i < keys.length; i++) {
 }
 
 const TAGPARSERS = {
-  1: words => wordsToBuffer(words, true), // 256 bits
-  16: words => wordsToBuffer(words, true), // 256 bits
-  13: words => wordsToBuffer(words, true).toString('utf8'), // string variable length
-  19: words => wordsToBuffer(words, true), // 264 bits
-  23: words => wordsToBuffer(words, true), // 256 bits
-  27: words => wordsToBuffer(words, true), // variable
+  1: words => hex.encode(bech32.fromWordsUnsafe(words)), // 256 bits
+  16: words => hex.encode(bech32.fromWordsUnsafe(words)), // 256 bits
+  13: words => utf8.encode(bech32.fromWordsUnsafe(words)), // string variable length
+  19: words => hex.encode(bech32.fromWordsUnsafe(words)), // 264 bits
+  23: words => hex.encode(bech32.fromWordsUnsafe(words)), // 256 bits
+  27: words => hex.encode(bech32.fromWordsUnsafe(words)), // variable
   6: wordsToIntBE, // default: 3600 (1 hour)
   24: wordsToIntBE, // default: 9
   3: routingInfoParser, // for extra routing info (private etc.)
@@ -101,37 +99,6 @@ function wordsToIntBE(words) {
   }, 0)
 }
 
-function convert(data, inBits, outBits) {
-  let value = 0
-  let bits = 0
-  const maxV = (1 << outBits) - 1
-
-  const result = []
-  for (let i = 0; i < data.length; ++i) {
-    value = (value << inBits) | data[i]
-    bits += inBits
-
-    while (bits >= outBits) {
-      bits -= outBits
-      result.push((value >> bits) & maxV)
-    }
-  }
-
-  if (bits > 0) {
-    result.push((value << (outBits - bits)) & maxV)
-  }
-
-  return result
-}
-
-function wordsToBuffer(words, trim) {
-  let buffer = Buffer.from(convert(words, 5, 8, true))
-  if (trim && (words.length * 5) % 8 !== 0) {
-    buffer = buffer.slice(0, -1)
-  }
-  return buffer
-}
-
 // first convert from words to buffer, trimming padding where necessary
 // parse in 51 byte chunks. See encoder for details.
 function routingInfoParser(words) {
@@ -141,16 +108,16 @@ function routingInfoParser(words) {
     feeBaseMSats,
     feeProportionalMillionths,
     cltvExpiryDelta
-  let routesBuffer = wordsToBuffer(words, true)
+  let routesBuffer = bech32.fromWordsUnsafe(words)
   while (routesBuffer.length > 0) {
-    pubkey = routesBuffer.slice(0, 33).toString('hex') // 33 bytes
-    shortChannelId = routesBuffer.slice(33, 41).toString('hex') // 8 bytes
-    feeBaseMSats = parseInt(routesBuffer.slice(41, 45).toString('hex'), 16) // 4 bytes
+    pubkey = hex.encode(routesBuffer.slice(0, 33)) // 33 bytes
+    shortChannelId = hex.encode(routesBuffer.slice(33, 41)) // 8 bytes
+    feeBaseMSats = parseInt(hex.encode(routesBuffer.slice(41, 45)), 16) // 4 bytes
     feeProportionalMillionths = parseInt(
-      routesBuffer.slice(45, 49).toString('hex'),
+      hex.encode(routesBuffer.slice(45, 49)),
       16
     ) // 4 bytes
-    cltvExpiryDelta = parseInt(routesBuffer.slice(49, 51).toString('hex'), 16) // 2 bytes
+    cltvExpiryDelta = parseInt(hex.encode(routesBuffer.slice(49, 51)), 16) // 2 bytes
 
     routesBuffer = routesBuffer.slice(51)
 
@@ -180,6 +147,7 @@ function featureBitsParser(words) {
   while (bools.length < FEATUREBIT_ORDER.length * 2) {
     bools.push(false)
   }
+
   const featureBits = {}
 
   FEATUREBIT_ORDER.forEach((featureName, index) => {
@@ -188,21 +156,21 @@ function featureBitsParser(words) {
       status = 'required'
     } else if (bools[index * 2 + 1]) {
       status = 'supported'
+    } else {
+      status = 'unsupported'
     }
     featureBits[featureName] = status
   })
 
-  if (bools.length > FEATUREBIT_ORDER.length * 2) {
-    const extraBits = bools.slice(FEATUREBIT_ORDER.length * 2)
-    featureBits.extra_bits = {
-      start_bit: FEATUREBIT_ORDER.length * 2,
-      bits: extraBits,
-      required: extraBits.reduce(
-        (result, bit, index) =>
-          index % 2 !== 0 ? result || false : result || bit,
-        false
-      )
-    }
+  const extraBits = bools.slice(FEATUREBIT_ORDER.length * 2)
+  featureBits.extra_bits = {
+    start_bit: FEATUREBIT_ORDER.length * 2,
+    bits: extraBits,
+    has_required: extraBits.reduce(
+      (result, bit, index) =>
+        index % 2 !== 0 ? result || false : result || bit,
+      false
+    )
   }
 
   return featureBits
@@ -222,15 +190,15 @@ function hrpToMillisat(hrpString, outputString) {
   if (!value.match(/^\d+$/))
     throw new Error('Not a valid human readable amount')
 
-  const valueBN = new BN(value, 10)
+  const valueBN = BigInt(value)
 
   const millisatoshisBN = divisor
-    ? valueBN.mul(MILLISATS_PER_BTC).div(DIVISORS[divisor])
-    : valueBN.mul(MILLISATS_PER_BTC)
+    ? (valueBN * MILLISATS_PER_BTC) / DIVISORS[divisor]
+    : valueBN * MILLISATS_PER_BTC
 
   if (
-    (divisor === 'p' && !valueBN.mod(new BN(10, 10)).eq(new BN(0, 10))) ||
-    millisatoshisBN.gt(MAX_MILLISATS)
+    (divisor === 'p' && !(valueBN % BigInt(10) === BigInt(0))) ||
+    millisatoshisBN > MAX_MILLISATS
   ) {
     throw new Error('Amount is outside of valid range')
   }
@@ -369,7 +337,7 @@ function decode(paymentRequest, network) {
   sections.push({
     name: 'signature',
     letters: letters.slice(0, 104),
-    value: wordsToBuffer(sigWords, true)
+    value: hex.encode(bech32.fromWordsUnsafe(sigWords))
   })
   letters = letters.slice(104)
 

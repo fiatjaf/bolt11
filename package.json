@@ -1,6 +1,6 @@
 {
   "name": "light-bolt11-decoder",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "",
   "main": "bolt11.js",
   "repository": {
@@ -19,12 +19,11 @@
   "author": "fiatjaf",
   "license": "MIT",
   "dependencies": {
-    "bech32": "^1.1.2",
-    "bn.js": "^4.11.8",
-    "buffer": "^6.0.3"
+    "@scure/base": "1.1.1"
   },
   "devDependencies": {
     "eslint": "^8.0.0",
+    "jest": "^29.4.3",
     "prettier": "^2.4.1"
   }
 }
