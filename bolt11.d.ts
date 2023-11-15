@@ -1,6 +1,6 @@
 declare module "light-bolt11-decoder" {
   type NetworkSection = {
-    name: string;
+    name: 'coin_network';
     letters: string;
     value?: {
       bech32: string;
