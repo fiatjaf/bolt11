@@ -15,10 +15,10 @@ const TESTNETWORK = {
   validWitnessVersions: [0]
 }
 const SIGNETNETWORK = {
-	bech32: 'tbs',
-	pubKeyHash: 0x6f,
-	scriptHash: 0xc4,
-	validWitnessVersions: [0]
+  bech32: 'tbs',
+  pubKeyHash: 0x6f,
+  scriptHash: 0xc4,
+  validWitnessVersions: [0]
 }
 const REGTESTNETWORK = {
   bech32: 'bcrt',
@@ -259,8 +259,8 @@ function decode(paymentRequest, network) {
         coinNetwork = TESTNETWORK
         break
       case SIGNETNETWORK.bech32:
-				coinNetwork = SIGNETNETWORK;
-				break
+        coinNetwork = SIGNETNETWORK
+        break
       case REGTESTNETWORK.bech32:
         coinNetwork = REGTESTNETWORK
         break
